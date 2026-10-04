@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="es"><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style><title>Caso Cerrado</title>
+<meta name="description" content="Seis casos de misterio con tablero de sudoku. Coloca a los sospechosos y descubre al asesino.">
+</head><body>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=IBM+Plex+Mono:wght@500&family=Public+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: ficha de caso arriba, tablero y fichas a la izquierda, lista de pistas a la derecha (apilado en móvil). */
+:root {
+  --bg: #e7ebee;
+  --surface: #f5f7f8;
+  --ink: #1a232c;
+  --muted: #566470;
+  --line: #b4bfc8;
+  --wall: #2b3742;
+  --accent: #b3261e;
+  --accent-ink: #ffffff;
+  --ok: #1f7a4d;
+  --room0: #d5e5f2;
+  --room1: #f0dcc6;
+  --room2: #d9e9d6;
+  --room3: #e6d9ef;
+  --room4: #f0e4b0;
+  --room5: #efd1d7;
+  --p0: #b3261e;
+  --p1: #2f5fb0;
+  --p2: #1f7a4d;
+  --p3: #7a3fa0;
+  --p4: #9a5600;
+  --p5: #00758a;
+  --font-display: "Big Shoulders Display", "Arial Narrow", Impact, sans-serif;
+  --font-body: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12171c; --surface: #1b222a; --ink: #e6ecf1; --muted: #93a1ad; --line: #3a4651;
+    --wall: #c7d2dc; --accent: #ff6b5f; --accent-ink: #1a0a08; --ok: #4cc58b;
+    --room0: #1f3344; --room1: #43362a; --room2: #26392a; --room3: #372b44; --room4: #4a4423; --room5: #44272d;
+    --p0: #d6453b; --p1: #4a7fd6; --p2: #2f9a66; --p3: #9a62c4; --p4: #b8731a; --p5: #1a97b0;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12171c; --surface: #1b222a; --ink: #e6ecf1; --muted: #93a1ad; --line: #3a4651;
+  --wall: #c7d2dc; --accent: #ff6b5f; --accent-ink: #1a0a08; --ok: #4cc58b;
+  --room0: #1f3344; --room1: #43362a; --room2: #26392a; --room3: #372b44; --room4: #4a4423; --room5: #44272d;
+  --p0: #d6453b; --p1: #4a7fd6; --p2: #2f9a66; --p3: #9a62c4; --p4: #b8731a; --p5: #1a97b0;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.45;
+  padding-inline: 16px;
+  padding-block: 18px 40px;
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.app { max-width: 1040px; margin-inline: auto; display: flex; flex-direction: column; gap: 18px; }
+
+/* Cabecera */
+.top { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+h1 { font-family: var(--font-display); font-weight: 800; font-size: clamp(40px, 11vw, 64px); line-height: .92; margin: 0; letter-spacing: .005em; text-transform: uppercase; text-wrap: balance; }
+.tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+.tab {
+  flex: 0 0 auto; min-width: 92px; text-align: left; padding: 8px 12px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--surface); display: flex; flex-direction: column; gap: 1px;
+}
+.tab .no { font-family: var(--font-mono); font-size: 11px; color: var(--muted); letter-spacing: .06em; }
+.tab .nm { font-weight: 600; font-size: 13px; white-space: nowrap; }
+.tab[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.tab[aria-selected="true"] .no { color: inherit; opacity: .75; }
+.tab.solved .no::after { content: " · resuelto"; color: var(--ok); }
+.tab[aria-selected="true"].solved .no::after { color: inherit; }
+
+/* Disposición principal */
+.layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; align-items: start; }
+@media (min-width: 900px) { .layout { grid-template-columns: minmax(0, 560px) minmax(0, 1fr); gap: 36px; } }
+.col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+
+.casehead { display: flex; flex-direction: column; gap: 4px; }
+.casehead h2 { font-family: var(--font-display); font-size: 28px; line-height: 1; margin: 0; text-transform: uppercase; letter-spacing: .01em; }
+.casehead p { margin: 0; color: var(--muted); }
+.meta { font-family: var(--font-mono); font-size: 12px; letter-spacing: .04em; color: var(--muted); }
+
+/* Tablero */
+.board-wrap { width: 100%; max-width: 560px; }
+.board {
+  --n: 5;
+  container-type: inline-size;
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+  border: 3px solid var(--wall);
+  background: var(--surface);
+  user-select: none;
+  -webkit-user-select: none;
+}
+.cell {
+  position: relative; aspect-ratio: 1; padding: 0; border: 0; border-radius: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--room0); color: var(--ink);
+  touch-action: manipulation;
+}
+.cell[data-room="0"] { background: var(--room0); }
+.cell[data-room="1"] { background: var(--room1); }
+.cell[data-room="2"] { background: var(--room2); }
+.cell[data-room="3"] { background: var(--room3); }
+.cell[data-room="4"] { background: var(--room4); }
+.cell[data-room="5"] { background: var(--room5); }
+.cell.obj { cursor: default; }
+.cell:not(.obj):hover { filter: brightness(1.06); }
+.cell:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; z-index: 2; }
+.rlabel {
+  position: absolute; top: 3px; left: 4px; pointer-events: none;
+  font-size: max(8px, calc(14cqw / var(--n))); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted);
+  line-height: 1;
+}
+.icon { width: 52%; height: 52%; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; opacity: .72; }
+.ocap { display: none; position: absolute; bottom: 3px; font-size: 10px; color: var(--muted); }
+@container (min-width: 440px) { .ocap { display: block; } .icon { margin-top: -8px; } }
+.tok {
+  width: 76%; aspect-ratio: 1; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-weight: 800; color: #fff;
+  font-size: calc(52cqw / var(--n)); line-height: 1; box-shadow: 0 1px 0 rgba(0,0,0,.25);
+}
+.tok.victim { border-radius: 8px; transform: rotate(45deg); }
+.tok.victim > span { transform: rotate(-45deg); }
+.tok.bad { outline: 3px solid var(--accent); outline-offset: 2px; }
+.marks {
+  position: absolute; inset: auto 2px 2px 2px; display: flex; flex-wrap: wrap; gap: 0 3px; justify-content: center;
+  font-family: var(--font-mono); font-size: max(9px, calc(16cqw / var(--n))); font-weight: 500; line-height: 1.1; pointer-events: none;
+}
+.marks s { text-decoration-thickness: 2px; }
+.cell.has-tok .marks { display: none; }
+
+.p0 { --pc: var(--p0); } .p1 { --pc: var(--p1); } .p2 { --pc: var(--p2); }
+.p3 { --pc: var(--p3); } .p4 { --pc: var(--p4); } .p5 { --pc: var(--p5); }
+.tok { background: var(--pc); }
+.marks s { color: var(--pc); }
+.who { color: var(--pc); font-weight: 700; }
+
+/* Fichas */
+.tray { display: grid; grid-template-columns: repeat(auto-fit, minmax(98px, 1fr)); gap: 8px; }
+.chip {
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--surface); text-align: left; min-width: 0;
+}
+.chip .dot { flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%; background: var(--pc); color: #fff; font-family: var(--font-display); font-weight: 800; display: flex; align-items: center; justify-content: center; font-size: 15px; }
+.chip.victim .dot { border-radius: 6px; }
+.chip .tx { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
+.chip .nm { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip .st { font-size: 11px; color: var(--muted); }
+.chip.on { border-color: var(--pc); box-shadow: 0 0 0 2px var(--pc); }
+.chip.placed .st { color: var(--ok); }
+
+/* Herramientas */
+.tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--surface); }
+.seg button { border: 0; background: transparent; padding: 8px 14px; font-weight: 600; font-size: 13px; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.btn { border: 1px solid var(--line); background: var(--surface); padding: 8px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; }
+.btn:hover { border-color: var(--ink); }
+.check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.check input { width: 18px; height: 18px; accent-color: var(--ink); }
+
+.status { min-height: 1.5em; font-size: 14px; }
+.status .panel { border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.status .accuse { display: flex; flex-wrap: wrap; gap: 8px; }
+.status .accuse button { border: 2px solid var(--pc); background: transparent; border-radius: 6px; padding: 8px 12px; font-weight: 700; color: var(--pc); }
+.status .accuse button:hover { background: var(--pc); color: #fff; }
+.status .win { border-color: var(--ok); }
+.status .win strong { font-family: var(--font-display); font-size: 24px; text-transform: uppercase; color: var(--ok); line-height: 1; }
+.status .err { color: var(--accent); font-weight: 600; }
+
+/* Pistas */
+.side h3 { font-family: var(--font-display); font-size: 22px; text-transform: uppercase; margin: 0 0 8px; letter-spacing: .02em; }
+.clues { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.clue { display: flex; gap: 10px; align-items: flex-start; width: 100%; text-align: left; padding: 9px 11px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+.clue .mk { flex: 0 0 auto; width: 18px; height: 18px; margin-top: 1px; border-radius: 50%; border: 2px solid var(--line); font-size: 11px; line-height: 14px; text-align: center; font-weight: 700; display: none; }
+.show-check .clue .mk { display: block; }
+.clue.ok .mk { border-color: var(--ok); color: var(--ok); }
+.clue.ok .mk::after { content: "✓"; }
+.clue.bad { border-color: var(--accent); }
+.clue.bad .mk { border-color: var(--accent); color: var(--accent); }
+.clue.bad .mk::after { content: "✗"; }
+.clue.struck .tt { text-decoration: line-through; opacity: .55; }
+.clue .tt { min-width: 0; overflow-wrap: anywhere; }
+
+.rules { margin-top: 16px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+.rules summary { padding: 10px 12px; font-weight: 600; cursor: pointer; }
+.rules ul { margin: 0; padding: 0 14px 12px 30px; display: flex; flex-direction: column; gap: 6px; }
+.rules .fine { padding: 0 12px 12px; margin: 0; color: var(--muted); font-size: 13px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .tok { transition: transform .12s ease; }
+  .cell { transition: filter .12s ease; }
+}
+</style>
+
+<main class="app">
+  <header class="top">
+    <p class="eyebrow">Expediente de crímenes · 6 casos</p>
+    <h1>Caso Cerrado</h1>
+    <div class="tabs" id="tabs" role="tablist" aria-label="Casos"></div>
+  </header>
+
+  <div class="layout">
+    <div class="col">
+      <div class="casehead" id="casehead"></div>
+      <div class="board-wrap"><div class="board" id="board" role="grid" aria-label="Tablero del caso"></div></div>
+      <div class="tray" id="tray"></div>
+      <div class="tools">
+        <div class="seg" role="group" aria-label="Modo">
+          <button type="button" id="m-place" aria-pressed="true">Colocar</button>
+          <button type="button" id="m-mark" aria-pressed="false">Descartar</button>
+        </div>
+        <button type="button" class="btn" id="b-hint">Pista</button>
+        <button type="button" class="btn" id="b-reset">Reiniciar</button>
+        <label class="check"><input type="checkbox" id="c-check"> Comprobar pistas</label>
+      </div>
+      <div class="status" id="status" aria-live="polite"></div>
+    </div>
+
+    <aside class="side" id="side">
+      <h3>Pistas</h3>
+      <ol class="clues" id="clues"></ol>
+      <details class="rules" id="rules">
+        <summary>Cómo se juega</summary>
+        <ul>
+          <li>Coloca a todas las personas en el tablero. Hay una por fila y una por columna, como en el sudoku.</li>
+          <li>Las casillas con un objeto están ocupadas y nadie puede estar encima.</li>
+          <li>Víctor comparte habitación con una sola persona: esa persona es el asesino.</li>
+          <li>Todas las pistas son ciertas. Toca una pista para tacharla cuando ya no te haga falta.</li>
+          <li>«Junto a» significa en una casilla contigua por arriba, abajo, izquierda o derecha, sin diagonales.</li>
+          <li>Con el modo Descartar puedes anotar dónde una persona no puede estar.</li>
+        </ul>
+        <p class="fine">Casos originales, creados para este juego. La idea de base es la de los crucigramas lógicos de misterio con tablero de sudoku.</p>
+      </details>
+    </aside>
+  </div>
+</main>
+
+<script>
+const PUZZLES = [{"n": 5, "rooms": [[0, 0, 0, 1, 1], [0, 0, 1, 1, 1], [0, 0, 2, 1, 2], [3, 3, 2, 2, 2], [3, 3, 3, 3, 3]], "roomNames": [{"n": "Cocina", "a": "la"}, {"n": "Salón", "a": "el"}, {"n": "Biblioteca", "a": "la"}, {"n": "Estudio", "a": "el"}], "objects": [{"k": "estantería", "r": 1, "c": 1}, {"k": "mesa", "r": 1, "c": 4}, {"k": "lámpara", "r": 2, "c": 1}, {"k": "cama", "r": 2, "c": 4}], "clues": [{"t": "left", "p": 4, "q": 2}, {"t": "left", "p": 1, "q": 3}, {"t": "near", "p": 4, "o": "mesa"}, {"t": "above", "p": 3, "q": 2}, {"t": "nonear", "p": 1, "o": "cama"}, {"t": "rowobj", "p": 0, "o": "lámpara"}, {"t": "room", "p": 1, "r": 0}], "solution": [[2, 0], [0, 1], [4, 4], [3, 2], [1, 3]], "murderer": 1, "name": "Primeros pasos", "level": "Fácil"}, {"n": 5, "rooms": [[2, 2, 4, 4, 4], [2, 2, 4, 4, 4], [1, 1, 1, 4, 4], [0, 1, 1, 3, 3], [0, 0, 1, 3, 3]], "roomNames": [{"n": "Cocina", "a": "la"}, {"n": "Salón", "a": "el"}, {"n": "Biblioteca", "a": "la"}, {"n": "Estudio", "a": "el"}, {"n": "Jardín", "a": "el"}], "objects": [{"k": "mesa", "r": 0, "c": 0}, {"k": "piano", "r": 4, "c": 4}, {"k": "planta", "r": 1, "c": 2}, {"k": "cama", "r": 2, "c": 4}], "clues": [{"t": "diff", "p": 0, "q": 1}, {"t": "colobj", "p": 0, "o": "planta"}, {"t": "near", "p": 4, "o": "mesa"}, {"t": "left", "p": 0, "q": 1}, {"t": "near", "p": 1, "o": "cama"}, {"t": "colobj", "p": 2, "o": "piano"}], "solution": [[4, 2], [2, 3], [0, 4], [3, 1], [1, 0]], "murderer": 3, "name": "Cena en la mansión", "level": "Fácil"}, {"n": 6, "rooms": [[1, 4, 0, 0, 0, 0], [1, 4, 4, 4, 0, 0], [1, 1, 1, 4, 4, 0], [3, 3, 1, 1, 0, 0], [3, 3, 1, 2, 2, 2], [3, 3, 2, 2, 2, 2]], "roomNames": [{"n": "Cocina", "a": "la"}, {"n": "Salón", "a": "el"}, {"n": "Biblioteca", "a": "la"}, {"n": "Estudio", "a": "el"}, {"n": "Jardín", "a": "el"}], "objects": [{"k": "lámpara", "r": 5, "c": 2}, {"k": "sofá", "r": 3, "c": 1}, {"k": "planta", "r": 3, "c": 3}, {"k": "piano", "r": 4, "c": 4}, {"k": "estantería", "r": 2, "c": 3}], "clues": [{"t": "alone", "p": 2}, {"t": "noroom", "p": 0, "r": 4}, {"t": "noroom", "p": 2, "r": 3}, {"t": "left", "p": 5, "q": 1}, {"t": "nonear", "p": 5, "o": "estantería"}, {"t": "nonear", "p": 2, "o": "piano"}, {"t": "same", "p": 0, "q": 3}, {"t": "near", "p": 4, "o": "planta"}, {"t": "above", "p": 1, "q": 2}, {"t": "left", "p": 5, "q": 0}, {"t": "colobj", "p": 3, "o": "lámpara"}], "solution": [[2, 1], [0, 5], [1, 3], [4, 2], [3, 4], [5, 0]], "murderer": 3, "name": "La noche de la tormenta", "level": "Medio"}, {"n": 6, "rooms": [[1, 1, 1, 4, 4, 4], [1, 1, 1, 1, 4, 4], [2, 2, 4, 4, 4, 4], [2, 2, 2, 2, 0, 0], [2, 2, 3, 2, 3, 0], [3, 3, 3, 3, 3, 0]], "roomNames": [{"n": "Cocina", "a": "la"}, {"n": "Salón", "a": "el"}, {"n": "Biblioteca", "a": "la"}, {"n": "Estudio", "a": "el"}, {"n": "Jardín", "a": "el"}], "objects": [{"k": "piano", "r": 5, "c": 0}, {"k": "mesa", "r": 4, "c": 3}, {"k": "planta", "r": 3, "c": 0}, {"k": "sofá", "r": 1, "c": 3}, {"k": "estantería", "r": 0, "c": 1}], "clues": [{"t": "near", "p": 4, "o": "sofá"}, {"t": "left", "p": 3, "q": 0}, {"t": "nonear", "p": 2, "o": "planta"}, {"t": "left", "p": 2, "q": 1}, {"t": "near", "p": 5, "o": "planta"}, {"t": "alone", "p": 4}, {"t": "diff", "p": 2, "q": 3}, {"t": "left", "p": 0, "q": 2}, {"t": "above", "p": 4, "q": 3}, {"t": "nonear", "p": 2, "o": "mesa"}, {"t": "colobj", "p": 4, "o": "mesa"}, {"t": "alone", "p": 5}], "solution": [[4, 2], [3, 5], [5, 4], [1, 1], [0, 3], [2, 0]], "murderer": 2, "name": "El testamento", "level": "Medio"}, {"n": 6, "rooms": [[2, 2, 2, 2, 5, 5], [2, 2, 2, 2, 5, 5], [1, 1, 0, 0, 5, 5], [1, 3, 0, 0, 5, 5], [3, 3, 0, 0, 4, 4], [3, 3, 0, 0, 4, 4]], "roomNames": [{"n": "Cocina", "a": "la"}, {"n": "Salón", "a": "el"}, {"n": "Biblioteca", "a": "la"}, {"n": "Estudio", "a": "el"}, {"n": "Jardín", "a": "el"}, {"n": "Bodega", "a": "la"}], "objects": [{"k": "mesa", "r": 0, "c": 4}, {"k": "lámpara", "r": 5, "c": 2}, {"k": "piano", "r": 2, "c": 0}, {"k": "sofá", "r": 1, "c": 2}, {"k": "cama", "r": 1, "c": 5}, {"k": "planta", "r": 3, "c": 0}], "clues": [{"t": "alone", "p": 4}, {"t": "same", "p": 2, "q": 5}, {"t": "near", "p": 0, "o": "sofá"}, {"t": "above", "p": 3, "q": 5}, {"t": "near", "p": 2, "o": "cama"}, {"t": "left", "p": 3, "q": 4}, {"t": "colobj", "p": 1, "o": "sofá"}], "solution": [[1, 3], [4, 2], [2, 5], [0, 0], [5, 1], [3, 4]], "murderer": 3, "name": "Último invitado", "level": "Difícil"}, {"n": 6, "rooms": [[0, 0, 0, 0, 2, 5], [1, 0, 0, 2, 2, 5], [1, 1, 1, 2, 2, 5], [1, 1, 4, 2, 5, 5], [1, 4, 4, 2, 5, 5], [1, 3, 3, 3, 5, 5]], "roomNames": [{"n": "Cocina", "a": "la"}, {"n": "Salón", "a": "el"}, {"n": "Biblioteca", "a": "la"}, {"n": "Estudio", "a": "el"}, {"n": "Jardín", "a": "el"}, {"n": "Bodega", "a": "la"}], "objects": [{"k": "piano", "r": 4, "c": 3}, {"k": "sofá", "r": 2, "c": 5}, {"k": "planta", "r": 4, "c": 0}, {"k": "mesa", "r": 0, "c": 3}, {"k": "lámpara", "r": 4, "c": 2}, {"k": "cama", "r": 3, "c": 5}], "clues": [{"t": "rowobj", "p": 4, "o": "mesa"}, {"t": "left", "p": 1, "q": 2}, {"t": "room", "p": 3, "r": 3}, {"t": "colobj", "p": 5, "o": "mesa"}, {"t": "left", "p": 3, "q": 2}, {"t": "room", "p": 2, "r": 4}, {"t": "above", "p": 1, "q": 5}], "solution": [[4, 4], [1, 0], [3, 2], [5, 1], [0, 5], [2, 3]], "murderer": 4, "name": "Doble fondo", "level": "Difícil"}];
+(function () {
+  var NAMES = ["Víctor", "Marta", "Ramón", "Lucía", "Teo", "Inés"];
+  var OBJART = { "mesa": "la mesa", "planta": "la planta", "sofá": "el sofá", "lámpara": "la lámpara", "piano": "el piano", "estantería": "la estantería", "cama": "la cama" };
+  var ICONS = {
+    "mesa": '<rect x="4" y="9" width="16" height="3" rx="1"/><path d="M6 12v7M18 12v7"/>',
+    "planta": '<path d="M12 20v-8"/><path d="M12 14c-5 0-6-5-6-8 4 0 6 3 6 8zM12 12c4 0 6-3 6-6-4 0-6 2-6 6z"/><path d="M8 20h8"/>',
+    "sofá": '<rect x="6" y="6" width="12" height="6" rx="2"/><path d="M3 12h18v6H3zM6 18v2M18 18v2"/>',
+    "lámpara": '<path d="M8 5h8l3 8H5z"/><path d="M12 13v6M9 20h6"/>',
+    "piano": '<rect x="3" y="7" width="18" height="11" rx="1"/><path d="M7 18v-4M11 18v-4M15 18v-4M19 18v-4M5.5 7v7M9.5 7v7M13.5 7v7M17.5 7v7"/>',
+    "estantería": '<rect x="5" y="4" width="14" height="16"/><path d="M5 9h14M5 14h14M10 4v5M14 9v5"/>',
+    "cama": '<path d="M3 19V8M21 19v-6H3"/><rect x="5" y="9" width="6" height="4" rx="1"/><path d="M3 19h18"/>'
+  };
+  var KEY = "caso-cerrado-v1";
+  var store = load();
+  var cur = Math.min(Math.max(store.cur || 0, 0), PUZZLES.length - 1);
+  var sel = null, mode = "place", lastCell = null, msg = "";
+
+  function load() {
+    try {
+      var s = JSON.parse(localStorage.getItem(KEY));
+      if (s && typeof s === "object" && s.cases) return s;
+    } catch (e) {}
+    return { cases: {}, cur: 0, check: false, seen: false };
+  }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) {} }
+  function st(i) {
+    if (!store.cases[i]) store.cases[i] = { placed: Array(PUZZLES[i].n).fill(null), marks: [], struck: [], hints: 0, solved: false };
+    return store.cases[i];
+  }
+  function P() { return PUZZLES[cur]; }
+  function S() { return st(cur); }
+  function el(id) { return document.getElementById(id); }
+  function roomOf(pos) { return P().rooms[pos[0]][pos[1]]; }
+  function objAt(r, c) { return P().objects.find(function (o) { return o.r === r && o.c === c; }); }
+
+  /* ----- texto de pistas ----- */
+  function who(p) { return '<b class="who p' + p + '">' + NAMES[p] + '</b>'; }
+  function rn(i) { var r = P().roomNames[i]; return r.a + " " + r.n; }
+  function textOf(c) {
+    switch (c.t) {
+      case "room": return who(c.p) + " estaba en " + rn(c.r) + ".";
+      case "noroom": return who(c.p) + " no estaba en " + rn(c.r) + ".";
+      case "near": return who(c.p) + " estaba junto a " + OBJART[c.o] + ".";
+      case "nonear": return who(c.p) + " no estaba junto a " + OBJART[c.o] + ".";
+      case "rowobj": return who(c.p) + " estaba en la misma fila que " + OBJART[c.o] + ".";
+      case "colobj": return who(c.p) + " estaba en la misma columna que " + OBJART[c.o] + ".";
+      case "same": return who(c.p) + " y " + who(c.q) + " estaban en la misma habitación.";
+      case "diff": return who(c.p) + " y " + who(c.q) + " estaban en habitaciones distintas.";
+      case "left": return who(c.p) + " estaba más a la izquierda que " + who(c.q) + ".";
+      case "above": return who(c.p) + " estaba más arriba que " + who(c.q) + ".";
+      case "alone": return "No había nadie más con " + who(c.p) + " en su habitación.";
+    }
+    return "";
+  }
+
+  /* ----- evaluación: 1 cumple, -1 incumple, 0 pendiente ----- */
+  function nearObj(pos, kind) {
+    return P().objects.some(function (o) { return o.k === kind && Math.abs(o.r - pos[0]) + Math.abs(o.c - pos[1]) === 1; });
+  }
+  function evalClue(c, placed) {
+    var a = placed[c.p], b = c.q != null ? placed[c.q] : null;
+    var o;
+    switch (c.t) {
+      case "room": return a ? (roomOf(a) === c.r ? 1 : -1) : 0;
+      case "noroom": return a ? (roomOf(a) !== c.r ? 1 : -1) : 0;
+      case "near": return a ? (nearObj(a, c.o) ? 1 : -1) : 0;
+      case "nonear": return a ? (!nearObj(a, c.o) ? 1 : -1) : 0;
+      case "rowobj": o = P().objects.find(function (x) { return x.k === c.o; }); return a ? (a[0] === o.r ? 1 : -1) : 0;
+      case "colobj": o = P().objects.find(function (x) { return x.k === c.o; }); return a ? (a[1] === o.c ? 1 : -1) : 0;
+      case "same": return a && b ? (roomOf(a) === roomOf(b) ? 1 : -1) : 0;
+      case "diff": return a && b ? (roomOf(a) !== roomOf(b) ? 1 : -1) : 0;
+      case "left": return a && b ? (a[1] < b[1] ? 1 : -1) : 0;
+      case "above": return a && b ? (a[0] < b[0] ? 1 : -1) : 0;
+      case "alone":
+        if (!a) return 0;
+        var inside = 0, pending = false;
+        for (var q = 0; q < placed.length; q++) {
+          if (q === c.p) continue;
+          if (!placed[q]) pending = true;
+          else if (roomOf(placed[q]) === roomOf(a)) inside++;
+        }
+        if (inside > 0) return -1;
+        return pending ? 0 : 1;
+    }
+    return 0;
+  }
+  function conflicts(placed) {
+    var bad = {};
+    for (var i = 0; i < placed.length; i++) for (var j = i + 1; j < placed.length; j++) {
+      if (placed[i] && placed[j] && (placed[i][0] === placed[j][0] || placed[i][1] === placed[j][1])) { bad[i] = true; bad[j] = true; }
+    }
+    return bad;
+  }
+  function victimMates(placed) {
+    if (!placed[0]) return null;
+    var vr = roomOf(placed[0]), out = [];
+    for (var q = 1; q < placed.length; q++) if (placed[q] && roomOf(placed[q]) === vr) out.push(q);
+    return out;
+  }
+  function isSolved(placed) {
+    if (placed.some(function (x) { return !x; })) return false;
+    if (Object.keys(conflicts(placed)).length) return false;
+    var m = victimMates(placed);
+    if (!m || m.length !== 1) return false;
+    return P().clues.every(function (c) { return evalClue(c, placed) === 1; });
+  }
+
+  /* ----- acciones ----- */
+  function nextUnplaced(from) {
+    var placed = S().placed, n = placed.length;
+    for (var k = 1; k <= n; k++) { var i = (from + k) % n; if (!placed[i]) return i; }
+    return null;
+  }
+  function clickCell(r, c) {
+    var s = S(), key;
+    msg = "";
+    if (objAt(r, c)) { msg = "Ahí hay un objeto. Nadie puede estar encima."; return; }
+    if (s.solved) return;
+    if (mode === "mark") {
+      if (sel == null) { msg = "Elige primero a una persona."; return; }
+      key = sel + ":" + r + ":" + c;
+      var ix = s.marks.indexOf(key);
+      if (ix >= 0) s.marks.splice(ix, 1); else s.marks.push(key);
+      return;
+    }
+    var occ = s.placed.findIndex(function (p) { return p && p[0] === r && p[1] === c; });
+    if (sel == null) {
+      if (occ >= 0) { sel = occ; s.placed[occ] = null; } else msg = "Elige primero a una persona.";
+    } else if (occ === sel) {
+      s.placed[sel] = null;
+    } else {
+      if (occ >= 0) s.placed[occ] = null;
+      s.placed[sel] = [r, c];
+      s.marks = s.marks.filter(function (k) { return k !== sel + ":" + r + ":" + c; });
+      sel = nextUnplaced(sel);
+    }
+  }
+  function hint() {
+    var s = S(); if (s.solved) return;
+    var sol = P().solution, pick = -1, i;
+    for (i = 0; i < sol.length; i++) if (!s.placed[i]) { pick = i; break; }
+    if (pick < 0) for (i = 0; i < sol.length; i++) if (s.placed[i][0] !== sol[i][0] || s.placed[i][1] !== sol[i][1]) { pick = i; break; }
+    if (pick < 0) { msg = "Todo está en su sitio."; return; }
+    for (i = 0; i < s.placed.length; i++) if (s.placed[i] && s.placed[i][0] === sol[pick][0] && s.placed[i][1] === sol[pick][1]) s.placed[i] = null;
+    s.placed[pick] = [sol[pick][0], sol[pick][1]];
+    s.hints++;
+    msg = NAMES[pick] + " va en la casilla marcada. Pistas usadas: " + s.hints + ".";
+    if (sel === pick) sel = nextUnplaced(pick);
+  }
+  function accuse(q) {
+    var s = S(), m = victimMates(s.placed);
+    if (m && m[0] === q) { s.solved = true; msg = ""; }
+    else msg = "ERR:" + NAMES[q] + " no estaba a solas con Víctor. Mira quién comparte su habitación.";
+  }
+
+  /* ----- pintado ----- */
+  function renderTabs() {
+    var t = el("tabs"); t.innerHTML = "";
+    PUZZLES.forEach(function (p, i) {
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "tab" + (st(i).solved ? " solved" : "");
+      b.setAttribute("role", "tab"); b.setAttribute("aria-selected", i === cur ? "true" : "false");
+      b.innerHTML = '<span class="no">CASO ' + (i + 1) + '</span><span class="nm">' + p.name + '</span>';
+      b.addEventListener("click", function () { cur = i; store.cur = i; sel = 0; msg = ""; var s = st(i); sel = s.placed.findIndex(function (x) { return !x; }); if (sel < 0) sel = null; save(); render(); });
+      t.appendChild(b);
+    });
+  }
+  function renderHead() {
+    var p = P(), n = p.n, k = p.roomNames.length;
+    el("casehead").innerHTML =
+      '<span class="meta">' + p.level.toUpperCase() + ' · ' + n + '×' + n + ' · ' + k + ' HABITACIONES · ' + (n - 1) + ' SOSPECHOSOS</span>' +
+      '<h2>' + p.name + '</h2>' +
+      '<p>' + who(0) + ' ha aparecido muerto. Solo una de las ' + (n - 1) + ' personas sospechosas estaba a solas con la víctima. Colócalas a todas y descubre quién fue.</p>';
+  }
+  function renderBoard() {
+    var p = P(), n = p.n, s = S(), b = el("board");
+    var bad = conflicts(s.placed);
+    b.style.setProperty("--n", n);
+    b.setAttribute("aria-rowcount", n); b.setAttribute("aria-colcount", n);
+    b.innerHTML = "";
+    var labeled = {};
+    for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) {
+      var rm = p.rooms[r][c], o = objAt(r, c);
+      var tok = s.placed.findIndex(function (x) { return x && x[0] === r && x[1] === c; });
+      var btn = document.createElement("button");
+      btn.type = "button"; btn.className = "cell" + (o ? " obj" : "") + (tok >= 0 ? " has-tok" : "");
+      btn.setAttribute("data-room", rm); btn.setAttribute("data-cell", r + "," + c);
+      btn.setAttribute("role", "gridcell");
+      var shadows = ["inset 0 0 0 .5px var(--line)"];
+      if (r > 0 && p.rooms[r - 1][c] !== rm) shadows.push("inset 0 3px 0 0 var(--wall)");
+      if (c > 0 && p.rooms[r][c - 1] !== rm) shadows.push("inset 3px 0 0 0 var(--wall)");
+      btn.style.boxShadow = shadows.join(",");
+      var rname = p.roomNames[rm].n, label = "Fila " + (r + 1) + ", columna " + (c + 1) + ", " + rname;
+      var html = "";
+      if (!labeled[rm]) { labeled[rm] = true; html += '<span class="rlabel">' + rname + '</span>'; }
+      if (o) {
+        html += '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">' + ICONS[o.k] + '</svg><span class="ocap">' + o.k + '</span>';
+        label += ", " + o.k;
+      } else if (tok >= 0) {
+        html += '<span class="tok p' + tok + (tok === 0 ? " victim" : "") + (bad[tok] ? " bad" : "") + '"><span>' + NAMES[tok][0] + '</span></span>';
+        label += ", " + NAMES[tok];
+      } else {
+        var ms = [];
+        for (var q = 0; q < n; q++) if (s.marks.indexOf(q + ":" + r + ":" + c) >= 0) ms.push('<s class="p' + q + '">' + NAMES[q][0] + '</s>');
+        if (ms.length) html += '<span class="marks">' + ms.join("") + '</span>';
+      }
+      btn.setAttribute("aria-label", label);
+      btn.innerHTML = html;
+      (function (rr, cc) { btn.addEventListener("click", function () { lastCell = rr + "," + cc; clickCell(rr, cc); save(); render(); }); })(r, c);
+      b.appendChild(btn);
+    }
+  }
+  function renderTray() {
+    var s = S(), t = el("tray"); t.innerHTML = "";
+    for (var i = 0; i < P().n; i++) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "chip p" + i + (i === 0 ? " victim" : "") + (sel === i ? " on" : "") + (s.placed[i] ? " placed" : "");
+      b.setAttribute("aria-pressed", sel === i ? "true" : "false");
+      b.innerHTML = '<span class="dot">' + NAMES[i][0] + '</span><span class="tx"><span class="nm">' + NAMES[i] + '</span><span class="st">' + (i === 0 ? "víctima" : "sospechoso") + (s.placed[i] ? " · puesto" : "") + '</span></span>';
+      (function (ii) { b.addEventListener("click", function () { sel = (sel === ii ? null : ii); msg = ""; render(); }); })(i);
+      t.appendChild(b);
+    }
+  }
+  function renderClues() {
+    var s = S(), ul = el("clues"); ul.innerHTML = "";
+    el("side").classList.toggle("show-check", !!store.check);
+    P().clues.forEach(function (c, i) {
+      var li = document.createElement("li");
+      var b = document.createElement("button");
+      b.type = "button";
+      var v = store.check ? evalClue(c, s.placed) : 0;
+      b.className = "clue" + (v === 1 ? " ok" : v === -1 ? " bad" : "") + (s.struck.indexOf(i) >= 0 ? " struck" : "");
+      b.innerHTML = '<span class="mk" aria-hidden="true"></span><span class="tt">' + textOf(c) + '</span>';
+      b.addEventListener("click", function () {
+        var ix = s.struck.indexOf(i);
+        if (ix >= 0) s.struck.splice(ix, 1); else s.struck.push(i);
+        save(); renderClues();
+      });
+      li.appendChild(b); ul.appendChild(li);
+    });
+  }
+  function renderStatus() {
+    var s = S(), box = el("status"), h = "";
+    if (s.solved) {
+      var m = victimMates(s.placed)[0], rm = P().roomNames[roomOf(s.placed[0])];
+      h = '<div class="panel win"><strong>Caso resuelto</strong><span>' + who(m) + ' estaba a solas con ' + who(0) + ' en ' + rm.a + ' ' + rm.n + '.' + (s.hints ? ' Pistas usadas: ' + s.hints + '.' : ' Sin pistas de ayuda.') + '</span>' +
+        (cur < PUZZLES.length - 1 ? '<span><button type="button" class="btn" id="b-next">Siguiente caso</button></span>' : '') + '</div>';
+    } else if (isSolved(s.placed)) {
+      var acc = "";
+      for (var q = 1; q < P().n; q++) acc += '<button type="button" class="p' + q + '" data-acc="' + q + '">' + NAMES[q] + '</button>';
+      h = '<div class="panel"><span>Todas las pistas encajan. ¿Quién estaba a solas con ' + who(0) + '?</span><div class="accuse">' + acc + '</div>' +
+        (msg.indexOf("ERR:") === 0 ? '<span class="err">' + msg.slice(4) + '</span>' : '') + '</div>';
+    } else if (msg) {
+      h = '<span class="' + (msg.indexOf("ERR:") === 0 ? "err" : "") + '">' + msg.replace("ERR:", "") + '</span>';
+    } else {
+      var placedN = s.placed.filter(Boolean).length;
+      h = '<span style="color:var(--muted)">' + (sel == null ? "Elige una persona y toca una casilla." : NAMES[sel] + " seleccionado. Toca una casilla del tablero.") + ' Colocados: ' + placedN + '/' + P().n + '.</span>';
+    }
+    box.innerHTML = h;
+    box.querySelectorAll("[data-acc]").forEach(function (b) { b.addEventListener("click", function () { accuse(+b.getAttribute("data-acc")); save(); render(); }); });
+    var nx = el("b-next");
+    if (nx) nx.addEventListener("click", function () { cur++; store.cur = cur; var s2 = st(cur); sel = s2.placed.findIndex(function (x) { return !x; }); if (sel < 0) sel = null; msg = ""; save(); render(); window.scrollTo(0, 0); });
+  }
+  function renderTools() {
+    el("m-place").setAttribute("aria-pressed", mode === "place" ? "true" : "false");
+    el("m-mark").setAttribute("aria-pressed", mode === "mark" ? "true" : "false");
+    el("c-check").checked = !!store.check;
+  }
+  function render() {
+    renderTabs(); renderHead(); renderBoard(); renderTray(); renderClues(); renderStatus(); renderTools();
+    if (lastCell) { var f = document.querySelector('[data-cell="' + lastCell + '"]'); if (f) f.focus({ preventScroll: true }); }
+  }
+
+  el("m-place").addEventListener("click", function () { mode = "place"; render(); });
+  el("m-mark").addEventListener("click", function () { mode = "mark"; render(); });
+  el("b-hint").addEventListener("click", function () { lastCell = null; hint(); save(); render(); });
+  el("b-reset").addEventListener("click", function () {
+    var s = S(); var wasSolved = s.solved;
+    store.cases[cur] = null; delete store.cases[cur]; var s2 = st(cur); void wasSolved;
+    sel = 0; msg = ""; lastCell = null; save(); render();
+  });
+  el("c-check").addEventListener("change", function (e) { store.check = e.target.checked; save(); renderClues(); });
+
+  var s0 = S(); sel = s0.placed.findIndex(function (x) { return !x; }); if (sel < 0) sel = null;
+  el("rules").open = !store.seen; store.seen = true; save();
+  render();
+  window.__caso = { PUZZLES: PUZZLES, evalClue: evalClue };
+})();
+</script>
+
+</body></html>
